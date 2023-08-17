@@ -1,4 +1,4 @@
-import React, { useRef, useEffect } from "react";
+import React, { useRef, useEffect, useState } from "react";
 import ReactDOM from "react-dom/client";
 import * as cornerstone from "cornerstone-core";
 import * as cornerstoneTools from "cornerstone-tools";
@@ -53,11 +53,16 @@ const drawTooth = (context, points, scale, color, toothBox, toothNumber) => {
     index >= 1 && context.lineTo(segment[0] * scale, segment[1] * scale);
   });
   context.closePath();
-  
+
   const upperGrad = context.createLinearGradient(0, 0, 0, toothBox.yMax);
-  const lowerGrad = context.createLinearGradient(0, toothBox.yMax, 0, toothBox.yMin);
+  const lowerGrad = context.createLinearGradient(
+    0,
+    toothBox.yMax,
+    0,
+    toothBox.yMin
+  );
   const grad = toothNumber < 16 ? upperGrad : lowerGrad;
-  grad.addColorStop(0, 'transparent');
+  grad.addColorStop(0, "transparent");
   grad.addColorStop(1, color);
   context.strokeStyle = grad;
   context.lineWidth = 5;
@@ -67,11 +72,11 @@ const drawTooth = (context, points, scale, color, toothBox, toothNumber) => {
   // context.fill();
 };
 
-const CornerstoneViewer = ({ imageId }) => {
+const CornerstoneViewer = ({ imageId, dimensions, setDimensions }) => {
   const viewportDiv = useRef(null);
 
   useEffect(() => {
-    if (viewportDiv.current && imageId) {
+    if (viewportDiv.current && imageId && dimensions) {
       const element = viewportDiv.current;
       cornerstone.enable(element);
       cornerstone.loadImage(imageId).then((image) => {
@@ -81,8 +86,20 @@ const CornerstoneViewer = ({ imageId }) => {
           teethShapes.forEach((tooth, index) => {
             const toothNumber = tooth.toothNumber;
             const maskPoints = makePairs(tooth.toothMask, 2);
-            const toothBox = {xMin: tooth.xMin, yMin: tooth.yMin, xMax: tooth.xMax, yMax: tooth.yMax};
-            drawTooth(context, maskPoints, SCALE, COLORS[index], toothBox, toothNumber);
+            const toothBox = {
+              xMin: tooth.xMin,
+              yMin: tooth.yMin,
+              xMax: tooth.xMax,
+              yMax: tooth.yMax,
+            };
+            drawTooth(
+              context,
+              maskPoints,
+              SCALE,
+              COLORS[index],
+              toothBox,
+              toothNumber
+            );
           });
         });
       });
@@ -93,17 +110,30 @@ const CornerstoneViewer = ({ imageId }) => {
         cornerstone.disable(viewportDiv.current);
       }
     };
-  }, [imageId]);
+  }, [imageId, dimensions]);
 
-  return (
-    <div ref={viewportDiv} style={{ width: `${imageWidth * THUMBNAIL_SCALE}px`, height: `${imageHeight * THUMBNAIL_SCALE}px` }} />
-  );
+  useEffect(() => {
+    const handleResize = () => {
+      setDimensions({
+        height: window.innerHeight,
+        width: window.innerWidth,
+      });
+    }
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
+  }, []);
+
+  return <div ref={viewportDiv} style={{ width: '100vw', height: '100vh' }} />;
 };
 
 const App = () => {
+  const [dimensions, setDimensions] = useState({ 
+    height: window.innerHeight,
+    width: window.innerWidth
+  })
   return (
     <div className="App">
-      <CornerstoneViewer imageId={imageId} className="canvas" />
+      <CornerstoneViewer setDimensions={setDimensions} dimensions={dimensions} imageId={imageId} className="canvas" style={{ width: `${dimensions.width}px`, height: `${dimensions.height}px` }} />
     </div>
   );
 };
