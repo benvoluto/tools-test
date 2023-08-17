@@ -1,171 +1,116 @@
-import React from "react";
-import { render } from "react-dom";
+import React, { useRef, useEffect } from "react";
+import ReactDOM from "react-dom/client";
 import * as cornerstone from "cornerstone-core";
-import * as cornerstoneMath from "cornerstone-math";
 import * as cornerstoneTools from "cornerstone-tools";
-import Hammer from "hammerjs";
+import * as cornerstoneMath from "cornerstone-math";
 import * as cornerstoneWebImageLoader from "cornerstone-web-image-loader";
+import { oneImage } from "./one-image";
 
 cornerstoneTools.external.cornerstone = cornerstone;
 cornerstoneTools.external.cornerstoneMath = cornerstoneMath;
 cornerstoneWebImageLoader.external.cornerstone = cornerstone;
-cornerstoneTools.external.Hammer = Hammer;
-
-const imageId =
-  "https://rawgit.com/cornerstonejs/cornerstoneWebImageLoader/master/examples/Renal_Cell_Carcinoma.jpg";
-
-const divStyle = {
-  width: "512px",
-  height: "512px",
-  position: "relative",
-  color: "white"
-};
-
-const bottomLeftStyle = {
-  bottom: "5px",
-  left: "5px",
-  position: "absolute",
-  color: "white"
-};
-
-const bottomRightStyle = {
-  bottom: "5px",
-  right: "5px",
-  position: "absolute",
-  color: "white"
-};
-
-class CornerstoneElement extends React.Component {
-  constructor(props) {
-    super(props);
-    this.state = {
-      stack: props.stack,
-      viewport: cornerstone.getDefaultViewport(null, undefined),
-      imageId: props.stack.imageIds[0]
-    };
-
-    this.onImageRendered = this.onImageRendered.bind(this);
-    this.onNewImage = this.onNewImage.bind(this);
-    this.onWindowResize = this.onWindowResize.bind(this);
-  }
-
-  render() {
-    return (
-      <div>
-        <div
-          className="viewportElement"
-          style={divStyle}
-          ref={input => {
-            this.element = input;
-          }}
-        >
-          <canvas className="cornerstone-canvas" />
-          <div style={bottomLeftStyle}>Zoom: {this.state.viewport.scale}</div>
-          <div style={bottomRightStyle}>
-            WW/WC: {this.state.viewport.voi.windowWidth} /{" "}
-            {this.state.viewport.voi.windowCenter}
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  onWindowResize() {
-    console.log("onWindowResize");
-    cornerstone.resize(this.element);
-  }
-
-  onImageRendered() {
-    const viewport = cornerstone.getViewport(this.element);
-    console.log(viewport);
-
-    this.setState({
-      viewport
-    });
-
-    console.log(this.state.viewport);
-  }
-
-  onNewImage() {
-    const enabledElement = cornerstone.getEnabledElement(this.element);
-
-    this.setState({
-      imageId: enabledElement.image.imageId
-    });
-  }
-
-  componentDidMount() {
-    const element = this.element;
-
-    // Enable the DOM Element for use with Cornerstone
-    cornerstone.enable(element);
-
-    // Load the first image in the stack
-    cornerstone.loadImage(this.state.imageId).then(image => {
-      // Display the first image
-      cornerstone.displayImage(element, image);
-
-      // Add the stack tool state to the enabled element
-      const stack = this.props.stack;
-      cornerstoneTools.addStackStateManager(element, ["stack"]);
-      cornerstoneTools.addToolState(element, "stack", stack);
-
-      cornerstoneTools.mouseInput.enable(element);
-      cornerstoneTools.mouseWheelInput.enable(element);
-      cornerstoneTools.wwwc.activate(element, 1); // ww/wc is the default tool for left mouse button
-      cornerstoneTools.pan.activate(element, 2); // pan is the default tool for middle mouse button
-      cornerstoneTools.zoom.activate(element, 4); // zoom is the default tool for right mouse button
-      cornerstoneTools.zoomWheel.activate(element); // zoom is the default tool for middle mouse wheel
-
-      cornerstoneTools.touchInput.enable(element);
-      cornerstoneTools.panTouchDrag.activate(element);
-      cornerstoneTools.zoomTouchPinch.activate(element);
-
-      element.addEventListener(
-        "cornerstoneimagerendered",
-        this.onImageRendered
-      );
-      element.addEventListener("cornerstonenewimage", this.onNewImage);
-      window.addEventListener("resize", this.onWindowResize);
-    });
-  }
-
-  componentWillUnmount() {
-    const element = this.element;
-    element.removeEventListener(
-      "cornerstoneimagerendered",
-      this.onImageRendered
-    );
-
-    element.removeEventListener("cornerstonenewimage", this.onNewImage);
-
-    window.removeEventListener("resize", this.onWindowResize);
-
-    cornerstone.disable(element);
-  }
-
-  componentDidUpdate(prevProps, prevState) {
-    const stackData = cornerstoneTools.getToolState(this.element, "stack");
-    const stack = stackData.data[0];
-    stack.currentImageIdIndex = this.state.stack.currentImageIdIndex;
-    stack.imageIds = this.state.stack.imageIds;
-    cornerstoneTools.addToolState(this.element, "stack", stack);
-
-    //const imageId = stack.imageIds[stack.currentImageIdIndex];
-    //cornerstoneTools.scrollToIndex(this.element, stack.currentImageIdIndex);
-  }
-}
-
-const stack = {
-  imageIds: [imageId],
-  currentImageIdIndex: 0
-};
-
-const App = () => (
-  <div>
-    <h2>Cornerstone React Component Example</h2>
-    <CornerstoneElement stack={{ ...stack }} />
-  </div>
+cornerstone.registerImageLoader(
+  "webImageLoader",
+  cornerstoneWebImageLoader.loadImage
 );
 
-render(<App />, document.getElementById("root"));
+const imageId =
+  "https://raw.githubusercontent.com/benvoluto/benvoluto.github.io/master/bw-sample.jpg";
+
+const teethShapes = oneImage.models.tooth_identification.findings;
+const imageWidth = oneImage.imageDimension.widthPx;
+const imageHeight = oneImage.imageDimension.heightPx;
+
+const SCALE = 0.84;
+const THUMBNAIL_SCALE = 0.9;
+
+const COLORS = [
+  "#fd7f6f55",
+  "#7eb0d555",
+  "#b2e06155",
+  "#bd7ebe55",
+  "#ffb55a55",
+  "#ffee6555",
+  "#beb9db55",
+  "#fdcce555",
+  "#8bd3c755",
+];
+
+const makePairs = (arr, chunkSize) => {
+  const res = [];
+  for (let i = 0; i < arr.length; i += chunkSize) {
+    const chunk = arr.slice(i, i + chunkSize);
+    res.push(chunk);
+  }
+  return res;
+};
+
+const drawTooth = (context, points, scale, color, toothBox, toothNumber) => {
+  context.beginPath();
+  const startPoint = points[0];
+  context.moveTo(startPoint[0] * scale, startPoint[1] * scale);
+  points.forEach((segment, index) => {
+    index >= 1 && context.lineTo(segment[0] * scale, segment[1] * scale);
+  });
+  context.closePath();
+  
+  const upperGrad = context.createLinearGradient(0, 0, 0, toothBox.yMax);
+  const lowerGrad = context.createLinearGradient(0, toothBox.yMax, 0, toothBox.yMin);
+  const grad = toothNumber < 16 ? upperGrad : lowerGrad;
+  grad.addColorStop(0, 'transparent');
+  grad.addColorStop(1, color);
+  context.strokeStyle = grad;
+  context.lineWidth = 5;
+  context.stroke();
+  // context.strokeStyle = color;
+  // context.fillStyle = color;
+  // context.fill();
+};
+
+const CornerstoneViewer = ({ imageId }) => {
+  const viewportDiv = useRef(null);
+
+  useEffect(() => {
+    if (viewportDiv.current && imageId) {
+      const element = viewportDiv.current;
+      cornerstone.enable(element);
+      cornerstone.loadImage(imageId).then((image) => {
+        cornerstone.displayImage(element, image);
+        element.addEventListener("cornerstoneimagerendered", function (e) {
+          const context = e.detail.canvasContext.canvas.getContext("2d");
+          teethShapes.forEach((tooth, index) => {
+            const toothNumber = tooth.toothNumber;
+            const maskPoints = makePairs(tooth.toothMask, 2);
+            const toothBox = {xMin: tooth.xMin, yMin: tooth.yMin, xMax: tooth.xMax, yMax: tooth.yMax};
+            drawTooth(context, maskPoints, SCALE, COLORS[index], toothBox, toothNumber);
+          });
+        });
+      });
+    }
+
+    return () => {
+      if (viewportDiv.current) {
+        cornerstone.disable(viewportDiv.current);
+      }
+    };
+  }, [imageId]);
+
+  return (
+    <div ref={viewportDiv} style={{ width: `${imageWidth * THUMBNAIL_SCALE}px`, height: `${imageHeight * THUMBNAIL_SCALE}px` }} />
+  );
+};
+
+const App = () => {
+  return (
+    <div className="App">
+      <CornerstoneViewer imageId={imageId} className="canvas" />
+    </div>
+  );
+};
+
+const root = ReactDOM.createRoot(document.getElementById("root"));
+root.render(
+  <React.StrictMode>
+    <App />
+  </React.StrictMode>
+);
