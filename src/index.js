@@ -4,7 +4,7 @@ import * as cornerstone from "cornerstone-core";
 import * as cornerstoneTools from "cornerstone-tools";
 import * as cornerstoneMath from "cornerstone-math";
 import * as cornerstoneWebImageLoader from "cornerstone-web-image-loader";
-import { oneImage } from "./one-image";
+import { image } from "./seg-image";
 
 cornerstoneTools.external.cornerstone = cornerstone;
 cornerstoneTools.external.cornerstoneMath = cornerstoneMath;
@@ -15,26 +15,69 @@ cornerstone.registerImageLoader(
 );
 
 const imageId =
-  "https://raw.githubusercontent.com/benvoluto/benvoluto.github.io/master/bw-sample.jpg";
+  "https://raw.githubusercontent.com/benvoluto/benvoluto.github.io/master/test-basic.png";
 
-const teethShapes = oneImage.models.tooth_identification.findings;
-const imageWidth = oneImage.imageDimension.widthPx;
-const imageHeight = oneImage.imageDimension.heightPx;
+const teethShapes = image.images[0].models.tooth_segmentation.findings;
+const PALETTE_TOKENS = {
+  orangeRed: "rgba(255,103,55,0.41)",
+  paleBlue: "rgba(113,197,244,0.2)",
+  grassGreen: "#b2e06155",
+  purple: "#bd7ebe55",
+  yellowOrange: "#ffb55a55",
+  yellow: "#ffee6555",
+  lilac: "#beb9db55",
+  magentaLight: "#fdcce555",
+  teal: "#8bd3c755",
+  paleTeal: "rgba(133,255,248,0.1)",
+  paleBlueGrey: "rgba(19,106,154,.1)",
+  paleGrey: "rgba(0,0,0,0.04)",
+  transWhite: "rgba(255,255,255,0.25)",
+};
 
-const SCALE = 0.84;
-const THUMBNAIL_SCALE = 0.9;
-
-const COLORS = [
-  "#fd7f6f55",
-  "#7eb0d555",
-  "#b2e06155",
-  "#bd7ebe55",
-  "#ffb55a55",
-  "#ffee6555",
-  "#beb9db55",
-  "#fdcce555",
-  "#8bd3c755",
-];
+const COLOR_TOKENS = {
+  mask: {
+    fill: "transparent",
+    stroke: "transparent",
+    strokeWidth: "3",
+    strokeGradient: PALETTE_TOKENS.paleBlue,
+    fillGradient: "transparent",
+  },
+  dentin: {
+    fill: "transparent",
+    fillGradient: PALETTE_TOKENS.paleBlueGrey,
+    stroke: "transparent",
+    strokeGradient: "transparent",
+    strokeWidth: "0",
+  },
+  enamel: {
+    fill: "transparent",
+    fillGradient: "transparent",
+    stroke: "transparent",
+    strokeGradient: "transparent",
+    strokeWidth: "0",
+  },
+  pulp: {
+    fill: "transparent",
+    stroke: PALETTE_TOKENS.paleGrey,
+    strokeGradient: "transparent",
+    fillGradient: PALETTE_TOKENS.paleTeal,
+    strokeWidth: "3",
+  },
+  caries: {
+    fill: "transparent",
+    fillGradient: PALETTE_TOKENS.orangeRed,
+    stroke: "transparent",
+    strokeGradient: "transparent",
+    strokeWidth: "0",
+  },
+  resto: {
+    fill: "transparent",
+    fillGradient: "transparent",
+    stroke: "transparent",
+    strokeGradient: "transparent",
+    strokeWidth: "0",
+  },
+};
 
 const makePairs = (arr, chunkSize) => {
   const res = [];
@@ -45,35 +88,145 @@ const makePairs = (arr, chunkSize) => {
   return res;
 };
 
-const drawTooth = (context, points, scale, color, toothBox, toothNumber) => {
-  context.beginPath();
-  const startPoint = points[0];
-  context.moveTo(startPoint[0] * scale, startPoint[1] * scale);
-  points.forEach((segment, index) => {
-    index >= 1 && context.lineTo(segment[0] * scale, segment[1] * scale);
-  });
-  context.closePath();
+const drawSegment = (label, context, points, bBox, toothNumber, tokens) => {
+  switch (label) {
+    case "caries":
+      let cariesFillGradient;
+      context.moveTo(points[0][0], points[0][1]);
+      context.beginPath();
+      points.forEach((segment, index) => {
+        index >= 1 && context.lineTo(segment[0], segment[1]);
+      });
 
-  const upperGrad = context.createLinearGradient(0, 0, 0, toothBox.yMax);
-  const lowerGrad = context.createLinearGradient(
-    0,
-    toothBox.yMax,
-    0,
-    toothBox.yMin
-  );
-  const grad = toothNumber < 16 ? upperGrad : lowerGrad;
-  grad.addColorStop(0, "transparent");
-  grad.addColorStop(1, color);
-  context.strokeStyle = grad;
-  context.lineWidth = 5;
-  context.stroke();
-  // context.strokeStyle = color;
-  // context.fillStyle = color;
-  // context.fill();
+      // is the caries horizontal or vertical shape?
+      // const isHorizOriented = (bBox.xMax > bBox.yMax);
+      // const isVertOriented = (bBox.xMax < bBox.yMax);
+     
+      // let xPoints = points.map((point) => point[0]);
+      // let yPoints = points.map((point) => point[1]);
+      // let xPointsMin = Math.min(...xPoints);
+      // let xPointsMax = Math.max(...xPoints);
+      // let yPointsMin = Math.min(...yPoints);
+      // let yPointsMax = Math.max(...yPoints);
+      // let xPointsMid = (xMin + xMax) / 2;
+      // let yPointsMid = (yMin + yMax) / 2;
+      // // is the caries on the left or right side of the tooth?
+      // const isLeftSide = (xPointsMid < bBox.xMax);
+      
+      if (toothNumber <= 16) {
+        cariesFillGradient = context.createLinearGradient(
+          0,
+          0,
+          0,
+          bBox.yMax
+        );
+      } else {
+        cariesFillGradient = context.createLinearGradient(
+          0,
+          bBox.yMax,
+          0,
+          bBox.yMin
+        );
+      }
+      cariesFillGradient.addColorStop(0, "transparent");
+      cariesFillGradient.addColorStop(1, tokens.fillGradient);
+      context.closePath();
+      context.fillStyle = cariesFillGradient;
+      context.fill();
+      break;
+
+    case "resto":
+      context.moveTo(points[0][0], points[0][1]);
+      context.beginPath();
+      points.forEach((segment, index) => {
+        index >= 1 && context.lineTo(segment[0], segment[1]);
+      });
+
+      const img = new Image();
+      img.src =
+        "https://raw.githubusercontent.com/benvoluto/benvoluto.github.io/master/pattern.png";
+      img.onload = () => {
+        const pattern = context.createPattern(img, "repeat");
+
+        points.forEach((segment, index) => {
+          index >= 1 && context.lineTo(segment[0], segment[1]);
+        });
+        context.fillStyle = pattern;
+        context.fill();
+      };
+      break;
+
+    default:
+      const firstPoint = points[0];
+      context.moveTo(firstPoint[0], firstPoint[1]);
+      context.beginPath();
+      points.forEach((segment, index) => {
+        index >= 1 && context.lineTo(segment[0], segment[1]);
+      });
+      context.closePath();
+      if (tokens.fillGradient !== "transparent") {
+        let fillGradient;
+        if (toothNumber <= 16) {
+          fillGradient = context.createLinearGradient(
+            0,
+            0,
+            0,
+            bBox.yMax * 0.75
+          );
+        } else {
+          fillGradient = context.createLinearGradient(
+            0,
+            bBox.yMax * 0.75,
+            0,
+            bBox.yMin
+          );
+        }
+        fillGradient.addColorStop(0, "transparent");
+        fillGradient.addColorStop(1, tokens.fillGradient);
+        context.fillStyle = fillGradient;
+        context.fill();
+      }
+      if (tokens.strokeGradient !== "transparent") {
+        let strokeGradient;
+        if (toothNumber <= 16) {
+          strokeGradient = context.createLinearGradient(0, 0, 0, bBox.yMax * 0.8);
+        } else {
+          strokeGradient = context.createLinearGradient(
+            0,
+            bBox.yMax * 0.7,
+            0,
+            bBox.yMin
+          );
+        }
+        strokeGradient.addColorStop(0, "transparent");
+        strokeGradient.addColorStop(1, tokens.strokeGradient);
+        context.strokeStyle = strokeGradient;
+        context.lineWidth = tokens["strokeWidth"];
+        context.stroke();
+      } 
+      if (tokens.stroke !== "transparent") {
+        context.strokeStyle = tokens.stroke;
+        context.lineWidth = tokens["strokeWidth"];
+        context.stroke();
+      }
+      break;
+  }
+
+  return true;
 };
 
 const CornerstoneViewer = ({ imageId, dimensions, setDimensions }) => {
   const viewportDiv = useRef(null);
+
+  const toothMasks = teethShapes.filter(segment => segment.label === 'mask');
+  // const toothBoundingBoxes = toothMasks.map((segment) => {
+  //   let xPoints = segment.points.map((point) => point[0]);
+  //   let yPoints = segment.points.map((point) => point[1]);
+  //   let xPointsMin = Math.min(...xPoints);
+  //   let xPointsMax = Math.max(...xPoints);
+  //   let yPointsMin = Math.min(...yPoints);
+  //   let yPointsMax = Math.max(...yPoints);
+  // });
 
   useEffect(() => {
     if (viewportDiv.current && imageId && dimensions) {
@@ -83,22 +236,26 @@ const CornerstoneViewer = ({ imageId, dimensions, setDimensions }) => {
         cornerstone.displayImage(element, image);
         element.addEventListener("cornerstoneimagerendered", function (e) {
           const context = e.detail.canvasContext.canvas.getContext("2d");
-          teethShapes.forEach((tooth, index) => {
-            const toothNumber = tooth.toothNumber;
-            const maskPoints = makePairs(tooth.toothMask, 2);
-            const toothBox = {
-              xMin: tooth.xMin,
-              yMin: tooth.yMin,
-              xMax: tooth.xMax,
-              yMax: tooth.yMax,
+          context.rect(0, 0, 846, 662);
+          context.fillStyle = "rgba(0,37,92,0.13)";
+          context.fill();
+          teethShapes.forEach((segment) => {
+            const toothNumber = segment.toothNumber;
+            const maskPoints = makePairs(segment.vertices, 2);
+            const label = segment.label;
+            const bBox = {
+              xMin: segment.xMin,
+              yMin: segment.yMin,
+              xMax: segment.xMax,
+              yMax: segment.yMax,
             };
-            drawTooth(
+            drawSegment(
+              label,
               context,
               maskPoints,
-              SCALE,
-              COLORS[index],
-              toothBox,
-              toothNumber
+              bBox,
+              toothNumber,
+              COLOR_TOKENS[label]
             );
           });
         });
@@ -110,30 +267,24 @@ const CornerstoneViewer = ({ imageId, dimensions, setDimensions }) => {
         cornerstone.disable(viewportDiv.current);
       }
     };
-  }, [imageId, dimensions]);
+  }, [imageId]);
 
-  useEffect(() => {
-    const handleResize = () => {
-      setDimensions({
-        height: window.innerHeight,
-        width: window.innerWidth,
-      });
-    }
-    window.addEventListener("resize", handleResize);
-    return () => window.removeEventListener("resize", handleResize);
-  }, []);
-
-  return <div ref={viewportDiv} style={{ width: '100vw', height: '100vh' }} />;
+  return <div ref={viewportDiv} style={{ width: "100vw", height: "100vh" }} />;
 };
 
 const App = () => {
-  const [dimensions, setDimensions] = useState({ 
+  const [dimensions, setDimensions] = useState({
     height: window.innerHeight,
-    width: window.innerWidth
-  })
+    width: window.innerWidth,
+  });
   return (
     <div className="App">
-      <CornerstoneViewer setDimensions={setDimensions} dimensions={dimensions} imageId={imageId} className="canvas" style={{ width: `${dimensions.width}px`, height: `${dimensions.height}px` }} />
+      <CornerstoneViewer
+        setDimensions={setDimensions}
+        dimensions={dimensions}
+        imageId={imageId}
+        className="canvas"
+      />
     </div>
   );
 };
