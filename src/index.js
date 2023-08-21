@@ -19,7 +19,7 @@ const imageId =
 
 const teethShapes = image.images[0].models.tooth_segmentation.findings;
 const PALETTE_TOKENS = {
-  orangeRed: "rgba(255,103,55,0.41)",
+  orangeRed: "rgba(255,103,55,0.3)",
   paleBlue: "rgba(113,197,244,0.2)",
   grassGreen: "#b2e06155",
   purple: "#bd7ebe55",
@@ -64,8 +64,8 @@ const COLOR_TOKENS = {
     strokeWidth: "3",
   },
   caries: {
-    fill: "transparent",
-    fillGradient: PALETTE_TOKENS.orangeRed,
+    fill: PALETTE_TOKENS.orangeRed,
+    fillGradient: "transparent",
     stroke: "transparent",
     strokeGradient: "transparent",
     strokeWidth: "0",
@@ -91,7 +91,7 @@ const makePairs = (arr, chunkSize) => {
 const drawSegment = (label, context, points, bBox, toothNumber, tokens) => {
   switch (label) {
     case "caries":
-      let cariesFillGradient;
+      // let cariesFillGradient;
       context.moveTo(points[0][0], points[0][1]);
       context.beginPath();
       points.forEach((segment, index) => {
@@ -113,25 +113,25 @@ const drawSegment = (label, context, points, bBox, toothNumber, tokens) => {
       // // is the caries on the left or right side of the tooth?
       // const isLeftSide = (xPointsMid < bBox.xMax);
       
-      if (toothNumber <= 16) {
-        cariesFillGradient = context.createLinearGradient(
-          0,
-          0,
-          0,
-          bBox.yMax
-        );
-      } else {
-        cariesFillGradient = context.createLinearGradient(
-          0,
-          bBox.yMax,
-          0,
-          bBox.yMin
-        );
-      }
-      cariesFillGradient.addColorStop(0, "transparent");
-      cariesFillGradient.addColorStop(1, tokens.fillGradient);
+      // if (toothNumber <= 16) {
+      //   cariesFillGradient = context.createLinearGradient(
+      //     0,
+      //     0,
+      //     0,
+      //     bBox.yMax
+      //   );
+      // } else {
+      //   cariesFillGradient = context.createLinearGradient(
+      //     0,
+      //     bBox.yMax,
+      //     0,
+      //     bBox.yMin
+      //   );
+      // }
+      // cariesFillGradient.addColorStop(0, "transparent");
+      // cariesFillGradient.addColorStop(1, tokens.fillGradient);
       context.closePath();
-      context.fillStyle = cariesFillGradient;
+      context.fillStyle = tokens.fill;
       context.fill();
       break;
 
